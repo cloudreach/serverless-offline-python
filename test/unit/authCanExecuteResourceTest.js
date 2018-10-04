@@ -34,6 +34,18 @@ describe('authCanExecuteResource', () => {
         });
       });
 
+      context('and Allow is lowercase', () => {
+        it('returns true', () => {
+          const policy = setup(
+            'allow',
+            resource
+          );
+
+          const canExecute = authCanExecuteResource(policy, resource);
+          expect(canExecute).to.eq(true);
+        });
+      });
+
       it('returns true', () => {
         const policy = setup(
           'Allow',
@@ -72,12 +84,10 @@ describe('authCanExecuteResource', () => {
   context('when the policy has multiple Statements', () => {
     const setup = statements => (
       {
-        Statement: statements.map((statement) => (
-          {
-            Effect: statement.Effect,
-            Resource: statement.Resource,
-          }
-        )),
+        Statement: statements.map(statement => ({
+          Effect: statement.Effect,
+          Resource: statement.Resource,
+        })),
       }
     );
     const resourceOne = 'arn:aws:execute-api:eu-west-1:random-account-id:random-api-id/development/GET/dinosaurs';

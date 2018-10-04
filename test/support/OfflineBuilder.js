@@ -9,7 +9,7 @@ function createHandler(handlers) {
   return funOptions => handlers[funOptions.handlerPath.split('/')[1]][funOptions.handlerName];
 }
 
-module.exports = class OffLineBuilder {
+module.exports = class OfflineBuilder {
   constructor(serviceBuilder, options) {
     this.serviceBuilder = serviceBuilder || new ServiceBuilder();
     this.handlers = {};
@@ -62,7 +62,7 @@ module.exports = class OffLineBuilder {
 
   toObject() {
     const offline = new Offline(this.serviceBuilder.toObject(), this.options);
-    sinon.stub(functionHelper, 'createHandler', createHandler(this.handlers));
+    sinon.stub(functionHelper, 'createHandler').callsFake(createHandler(this.handlers));
     sinon.stub(offline, 'printBlankLine');
     this.server = offline._buildServer();
     Object.assign(this.server, {

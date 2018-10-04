@@ -59,6 +59,14 @@ describe('createLambdaProxyContext', () => {
       expect(lambdaProxyContext.body).to.be.null();
     });
 
+    it('should have a unique requestId', () => {
+      const prefix = 'offlineContext_requestId_';
+      expect(lambdaProxyContext.requestContext.requestId.length).to.be.greaterThan(prefix.length);
+
+      const randomNumber = +lambdaProxyContext.requestContext.requestId.slice(prefix.length);
+      expect(randomNumber).to.be.a('number');
+    });
+
     it('should match fixed attributes', () => {
       expectFixedAttributes(lambdaProxyContext);
     });
@@ -181,6 +189,100 @@ describe('createLambdaProxyContext', () => {
     });
   });
 
+  context('with a POST /fn1 request with a lowercase Content-Type header', () => {
+    it('should assign the value to Content-Type', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('content-type', 'custom/test');
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(lambdaProxyContext.headers['content-type']).to.eq('custom/test');
+    });
+  });
+
+  context('with a POST /fn1 request with a single content-type header', () => {
+    it('should not assign the value to Content-Type', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('content-type', 'custom/test');
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(lambdaProxyContext.headers['Content-Type']).to.eq(undefined);
+    });
+  });
+
+  context('with a POST /fn1 request with a accept header', () => {
+    it('should assign the value to accept', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('accept', 'custom/test');
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(lambdaProxyContext.headers.accept).to.eq('custom/test');
+    });
+  });
+
+  context('with a POST /fn1 request with a camelcase Content-Type header', () => {
+    it('should assign the value to Content-Type', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('Content-Type', 'custom/test');
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(lambdaProxyContext.headers['Content-Type']).to.eq('custom/test');
+    });
+  });
+
+  context('with a POST /fn1 request with a set Content-length', () => {
+    it('should have one content-length header only', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('content-type', 'custom/test');
+      requestBuilder.addHeader('content-length', '2');
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(Object.keys(lambdaProxyContext.headers).filter(header => header === 'content-length')).to.have.lengthOf(1);
+    });
+  });
+
+  context('with a POST /fn1 request with a set Content-length', () => {
+    it('should have one content-length header only', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('content-type', 'custom/test');
+      requestBuilder.addHeader('Content-length', '2');
+
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+      expect(Object.keys(lambdaProxyContext.headers).filter(header => header.toLowerCase() === 'content-length')).to.have.lengthOf(1);
+    });
+  });
+
+  context('with a POST /fn1 request with a X-GitHub-Event header', () => {
+    it('should assign not change the header case', () => {
+      const requestBuilder = new RequestBuilder('POST', '/fn1');
+      requestBuilder.addBody({ key: 'value' });
+      requestBuilder.addHeader('X-GitHub-Event', 'test');
+
+      const request = requestBuilder.toObject();
+
+      const lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+
+      expect(lambdaProxyContext.headers['X-GitHub-Event']).to.eq('test');
+    });
+  });
+
   context('with a GET /fn1/{id} request with path parameters', () => {
     const requestBuilder = new RequestBuilder('GET', '/fn1/1234');
     requestBuilder.addParam('id', '1234');
@@ -212,6 +314,82 @@ describe('createLambdaProxyContext', () => {
     it('should have a path parameter', () => {
       expect(Object.keys(lambdaProxyContext.pathParameters).length).to.eq(1);
       expect(lambdaProxyContext.pathParameters.id).to.eq('test%7C1234');
+    });
+  });
+
+  context('with a GET /fn1?param=1 request with single parameter in query string', () => {
+    const requestBuilder = new RequestBuilder('GET', '/fn1?param=1');
+    requestBuilder.addQuery('param', '1');
+    const request = requestBuilder.toObject();
+
+    let lambdaProxyContext;
+
+    before(() => {
+      lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+    });
+
+    it('should have a query parameter named param', () => {
+      expect(Object.keys(lambdaProxyContext.queryStringParameters).length).to.eq(1);
+      expect(lambdaProxyContext.queryStringParameters.param).to.eq('1');
+    });
+  });
+
+  context('with a GET /fn1?param=1&param2=1 request with double parameters in query string', () => {
+    const requestBuilder = new RequestBuilder('GET', '/fn1?param=1');
+    requestBuilder.addQuery('param', '1');
+    requestBuilder.addQuery('param2', '1');
+    const request = requestBuilder.toObject();
+
+    let lambdaProxyContext;
+
+    before(() => {
+      lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+    });
+
+    it('should have a two query parameters', () => {
+      expect(Object.keys(lambdaProxyContext.queryStringParameters).length).to.eq(2);
+      expect(lambdaProxyContext.queryStringParameters.param).to.eq('1');
+      expect(lambdaProxyContext.queryStringParameters.param2).to.eq('1');
+    });
+  });
+
+  context('with a GET /fn1?param=1&param=1 request with single query string', () => {
+    const requestBuilder = new RequestBuilder('GET', '/fn1?param=1');
+    // emaulate HAPI `query` as described here:
+    // https://futurestud.io/tutorials/hapi-how-to-use-query-parameters#multiplequeryparametersofthesamename
+    requestBuilder.addQuery('param', ['1', '2']);
+    const request = requestBuilder.toObject();
+
+    let lambdaProxyContext;
+
+    before(() => {
+      lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+    });
+
+    it('should have a two query parameters', () => {
+      expect(Object.keys(lambdaProxyContext.queryStringParameters).length).to.eq(1);
+      expect(lambdaProxyContext.queryStringParameters.param).to.eq('2');
+    });
+  });
+
+  context('with a request that includes cognito-identity-id header', () => {
+    const requestBuilder = new RequestBuilder('GET', '/fn1');
+    const testId = 'test-id';
+    requestBuilder.addHeader('cognito-identity-id', testId);
+    const request = requestBuilder.toObject();
+    let lambdaProxyContext;
+
+    before(() => {
+      lambdaProxyContext = createLambdaProxyContext(request, options, stageVariables);
+    });
+
+    it('should have the expected cognitoIdentityId', () => {
+      expect(lambdaProxyContext.requestContext.identity.cognitoIdentityId).to.eq(testId);
+    });
+
+    it('should have the expected headers', () => {
+      expect(Object.keys(lambdaProxyContext.headers).length).to.eq(1);
+      expect(lambdaProxyContext.headers['cognito-identity-id']).to.eq(testId);
     });
   });
 });

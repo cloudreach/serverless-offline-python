@@ -21,8 +21,10 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
     }
     identityHeader = identitySourceMatch[1].toLowerCase();
   }
-  
+
   const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
+
+  const serviceRuntime = serverless.service.provider.runtime;
 
   // Create Auth Scheme
   return () => ({
@@ -76,8 +78,21 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
         return reply(Boom.badImplementation(null, `Error while loading ${authFunName}: ${err.message}`));
       }
 
+      let done = false;
       // Creat the Lambda Context for the Auth function
-      const lambdaContext = createLambdaContext(authFun, (err, result) => {
+      const lambdaContext = createLambdaContext(authFun, (err, result, fromPromise) => {
+        if (done) {
+          const warning = fromPromise
+            ? `Warning: Auth function '${authFunName}' returned a promise and also uses a callback!\nThis is problematic and might cause issues in your lambda.`
+            : `Warning: callback called twice within Auth function '${authFunName}'!`;
+
+          serverlessLog(warning);
+
+          return;
+        }
+
+        done = true;
+
         // Return an unauthorized response
         const onError = error => {
           serverlessLog(`Authorization function returned an error response: (λ: ${authFunName})`, error);
@@ -106,7 +121,7 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
           serverlessLog(`Authorization function returned a successful response: (λ: ${authFunName})`, policy);
 
           // Set the credentials for the rest of the pipeline
-          return reply.continue({ credentials: { user: policy.principalId, context: policy.context } });
+          return reply.continue({ credentials: { user: policy.principalId, context: policy.context, usageIdentifierKey: policy.usageIdentifierKey } });
         };
 
         if (result && typeof result.then === 'function' && typeof result.catch === 'function') {
@@ -121,8 +136,13 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
         }
       });
 
-      // Execute the Authorization Function
-      handler(event, lambdaContext, lambdaContext.done);
+      const x = handler(event, lambdaContext, lambdaContext.done);
+
+      // Promise support
+      if ((serviceRuntime === 'nodejs8.10' || serviceRuntime === 'babel') && !done) {
+        if (x && typeof x.then === 'function' && typeof x.catch === 'function') x.then(lambdaContext.succeed).catch(lambdaContext.fail);
+        else if (x instanceof Error) lambdaContext.fail(x);
+      }
     },
   });
 };
