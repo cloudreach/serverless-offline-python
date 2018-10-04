@@ -11,19 +11,14 @@ const handlerCache = {};
 const messageCallbacks = {};
 
 function runPythonHandler(funOptions, options) {
-  var spawn = require("child_process").spawn;
+  let spawn = require("child_process").spawn;
   return function (event, context) {
     let data = JSON.stringify(event) + '\n';
-    var process = spawn('sls', ["invoke", "local", "-f", funOptions.funName, '-d', data],
+    let process = spawn('sls', ["invoke", "local", "-f", funOptions.funName, '-d', data],
       {
         stdio: [ 'ignore', 'pipe', 'pipe' ],
         cwd: funOptions.servicePath
       });
-
-    console.log('event', event);
-
-    //process.stdin.write(JSON.stringify(event) + "\n");
-    //process.stdin.end();
 
     let results = ''
     let hasDetectedJson = false;
