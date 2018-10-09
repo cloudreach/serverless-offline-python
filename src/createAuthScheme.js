@@ -22,9 +22,8 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
     identityHeader = identitySourceMatch[1].toLowerCase();
   }
 
-  const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
-
   const serviceRuntime = serverless.service.provider.runtime;
+  const funOptions = functionHelper.getFunctionOptions(authFun, authFunName, servicePath, serviceRuntime);
 
   // Create Auth Scheme
   return () => ({
@@ -105,7 +104,7 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
         }
 
         const onSuccess = policy => {
-        // Validate that the policy document has the principalId set
+          // Validate that the policy document has the principalId set
           if (!policy.principalId) {
             serverlessLog(`Authorization response did not include a principalId: (λ: ${authFunName})`, err);
 
